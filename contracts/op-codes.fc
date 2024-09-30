@@ -1,0 +1,3 @@
+int op::save_adress_public_parameter() asm "0x1 PUSHINT";
+int op::update_adress_public_parameter() asm "0x2 PUSHINT";
+int op::delete_adress_public_parameter() asm "0x3 PUSHINT";

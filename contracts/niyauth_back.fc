@@ -1,0 +1,90 @@
+#include "imports/stdlib.fc";
+#include "op-codes.fc";
+
+int public_key_size() asm "0x210 PUSHINT";
+int timestamp_size() asm "0x40 PUSHINT";
+int block_size() asm "0x250 PUSHINT";
+forall X -> int cast_to_int (X x) asm "NOP";
+
+cell load_data() {
+	cell data = get_data();
+	slice ds = data.begin_parse();
+	if (ds.slice_bits() == 0) {
+		return new_dict();
+	} else {
+		return data;
+	}
+}
+
+(int, slice) get_key(int key) method_id {
+	cell dic = load_data();
+
+    (slice payload, int success) = dic.udict_get?(256, key);
+    throw_unless(98, success);
+
+    int valid_until = payload~load_uint(timestamp_size());
+	return (valid_until, payload);
+    
+}
+
+slice parse_sender_address (cell in_msg_full) inline {
+    var cs = in_msg_full.begin_parse();
+    var flags = cs~load_uint(4);
+    slice sender_address = cs~load_msg_addr();
+    return sender_address;
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    int op = in_msg_body~load_uint(32);
+	int query_id = in_msg_body~load_uint(64);
+
+    cell data = get_data();
+    slice ds = data.begin_parse();
+    cell dic = ds.slice_bits() == 0 ? new_dict() : data;
+     
+    if (op == op::save_adress_public_parameter()) {
+	;; здесь будем добавлять новые значения
+        int timestamp = now();
+        int month = 60 * 60 * 24 * 30;
+        
+        int public_key_type_prefix = in_msg_body~load_uint(8);
+        int public_key_size_prefix = in_msg_body~load_uint(8);
+        int public_key_x = in_msg_body~load_uint(256);
+        int public_key_y = in_msg_body~load_uint(256);
+        
+        cell value = begin_cell()
+        .store_uint(timestamp + month, timestamp_size())
+        .store_uint(public_key_type_prefix, 8)
+        .store_uint(public_key_size_prefix, 8)
+        .store_uint(public_key_x, 256)
+        .store_uint(public_key_y, 256)
+        .end_cell();
+        slice block = value.begin_parse();
+
+        var sender_address = parse_sender_address(in_msg_full);
+        dic~dict_set(256, sender_address, block);
+        set_data(dic);
+        return ();
+	}
+	if (op == op::delete_adress_public_parameter()) {
+        in_msg_body.end_parse();
+        int key = -1;
+        do {
+            (key, slice cs, int f) = dic.udict_get_next?(block_size(), key);
+            if (f) {
+                int valid_until = cs~load_uint(64);
+                if (valid_until < now()) {
+                    ;; здесь будем удалять
+                    dic~udict_delete?(block_size(), key);
+                }
+            }
+        } until (~ f);
+        if (dic.dict_empty?()) {
+            set_data(begin_cell().end_cell());
+        } else {
+            set_data(dic);
+        }
+            return ();
+	}
+    throw (1001);
+}
