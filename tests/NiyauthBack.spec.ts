@@ -1,5 +1,5 @@
 import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
-import { beginCell, BitString, Cell, toNano } from '@ton/core';
+import { Address, beginCell, BitString, Cell, toNano } from '@ton/core';
 import { NiyauthBack } from '../wrappers/NiyauthBack';
 import '@ton/test-utils';
 import { compile } from '@ton/blueprint';
@@ -59,7 +59,6 @@ describe('NiyauthBack', () => {
     });
 
     it('should store and retrieve values', async () => {
-        //0440F258163F65F65865A79A4279E2EBABB5A57B85501DD4B381D1DC605C434876E34C308BD3F18F062D5CC07F34948CED82F9A76F9C3E65AE64F158412DA8E92E6D
         let result = await niyauthBack.sendSet(user1.getSender(), toNano('0.05'), {
             queryId: 123n,
             value: beginCell()
@@ -76,8 +75,8 @@ describe('NiyauthBack', () => {
             to: niyauthBack.address,
             success: true,
         });
+        
         blockchain.now = 1500;
-
         result = await niyauthBack.sendSet(user2.getSender(), toNano('0.05'), {
             queryId: 123n,
             value: beginCell()
@@ -111,9 +110,13 @@ describe('NiyauthBack', () => {
             to: niyauthBack.address,
             success: true,
         });
-        let [validUntil, value] = await niyauthBack.getByKey(
-            BigInt('0x' + user1.address.toRaw().toString('hex', 0, 32)),
-        );
+
+        
+
+        const User1addressCell = beginCell().storeAddress(user1.address).endCell();
+        
+        
+        let [validUntil, value] = await niyauthBack.getByKey(User1addressCell);
         
         expect(value).toEqualSlice(
             beginCell()
@@ -125,7 +128,7 @@ describe('NiyauthBack', () => {
                 .asSlice(),
         );
 
-        [validUntil, value] = await niyauthBack.getByKey(BigInt('0x' + user2.address.toRaw().toString('hex', 0, 32)));
+        [validUntil, value] = await niyauthBack.getByKey(beginCell().storeAddress(user2.address).endCell());
         expect(validUntil).toEqual(1500n + 60n * 60n * 24n * 30n);
         expect(value).toEqualSlice(
             beginCell()
@@ -136,7 +139,7 @@ describe('NiyauthBack', () => {
                 .asSlice(),
         );
 
-        [validUntil, value] = await niyauthBack.getByKey(BigInt('0x' + user3.address.toRaw().toString('hex', 0, 32)));
+        [validUntil, value] = await niyauthBack.getByKey(beginCell().storeAddress(user3.address).endCell());
         expect(validUntil).toEqual(2500n + 60n * 60n * 24n * 30n);
         expect(value).toEqualSlice(
             beginCell()

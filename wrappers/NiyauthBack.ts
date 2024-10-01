@@ -65,8 +65,8 @@ export class NiyauthBack implements Contract {
         });
     }
 
-    async getByKey(provider: ContractProvider, key: bigint): Promise<[bigint, Slice]> {
-        const result = (await provider.get('get_key', [{ type: 'int', value: key }])).stack;
+    async getByKey(provider: ContractProvider, key: Cell): Promise<[bigint, Slice]> {
+        const result = (await provider.get('get_key', [{ type: 'cell', cell: key }])).stack;
         return [result.readBigNumber(), (result.peek() as TupleItemSlice).cell.asSlice()];
     }
 }

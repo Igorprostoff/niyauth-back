@@ -4,6 +4,9 @@
 int public_key_size() asm "0x210 PUSHINT";
 int timestamp_size() asm "0x40 PUSHINT";
 int block_size() asm "0x250 PUSHINT";
+
+(slice, int) dict_get?(cell dict, int key_len, slice index) asm(index dict key_len) "DICTUGET" "NULLSWAPIFNOT";
+
 forall X -> int cast_to_int (X x) asm "NOP";
 
 cell load_data() {
@@ -16,10 +19,15 @@ cell load_data() {
 	}
 }
 
-(int, slice) get_key(int key) method_id {
+(int, slice) get_key(cell key) method_id {
 	cell dic = load_data();
 
-    (slice payload, int success) = dic.udict_get?(256, key);
+    
+    slice kslice = key.begin_parse();
+    
+    int addr = kslice~load_uint(256);
+    
+    (slice payload, int success) = dic.udict_get?(256, addr);
     throw_unless(98, success);
 
     int valid_until = payload~load_uint(timestamp_size());
@@ -27,10 +35,14 @@ cell load_data() {
     
 }
 
-slice parse_sender_address (cell in_msg_full) inline {
+int parse_sender_address (cell in_msg_full) inline {
     var cs = in_msg_full.begin_parse();
+    
     var flags = cs~load_uint(4);
-    slice sender_address = cs~load_msg_addr();
+    if (flags & 1) { ;; ignore all bounced messages
+        return 0;
+    }
+    int sender_address = cs~load_uint(256);
     return sender_address;
 }
 
@@ -46,7 +58,7 @@ slice parse_sender_address (cell in_msg_full) inline {
 	;; здесь будем добавлять новые значения
         int timestamp = now();
         int month = 60 * 60 * 24 * 30;
-        
+
         int public_key_type_prefix = in_msg_body~load_uint(8);
         int public_key_size_prefix = in_msg_body~load_uint(8);
         int public_key_x = in_msg_body~load_uint(256);
@@ -61,8 +73,9 @@ slice parse_sender_address (cell in_msg_full) inline {
         .end_cell();
         slice block = value.begin_parse();
 
-        var sender_address = parse_sender_address(in_msg_full);
-        dic~dict_set(256, sender_address, block);
+        int sender_address = parse_sender_address(in_msg_full);
+
+        dic~udict_set(256, sender_address, block);
         set_data(dic);
         return ();
 	}
